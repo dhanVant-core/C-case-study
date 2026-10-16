@@ -1,0 +1,22 @@
+# Compiled object files
+*.o
+*.obj
+*.hex
+*.elf
+
+# Editor & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Simulation scratch files
+scratch/
+*.tmp
