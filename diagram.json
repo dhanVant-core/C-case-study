@@ -3,7 +3,29 @@
   "author": "Virtual Home Load Profiling",
   "editor": "wokwi",
   "parts": [
-    { "type": "wokwi-arduino-mega", "id": "mega", "top": 10.2, "left": 102, "attrs": {} }
+    { "type": "wokwi-arduino-mega", "id": "mega", "top": 10.2, "left": 102, "attrs": {} },
+    { "type": "wokwi-lcd2004", "id": "lcd1", "top": -230, "left": 40, "attrs": { "pins": "i2c" } },
+    {
+      "type": "chip-appliance",
+      "id": "fridge",
+      "top": 330,
+      "left": -160,
+      "attrs": { "kind": "0", "fault": "0", "timeScale": "1440" }
+    },
+    {
+      "type": "chip-appliance",
+      "id": "microwave",
+      "top": 390,
+      "left": -98,
+      "attrs": { "kind": "1", "fault": "0", "timeScale": "1440" }
+    },
+    {
+      "type": "chip-appliance",
+      "id": "dishwasher",
+      "top": 330,
+      "left": -36,
+      "attrs": { "kind": "2", "fault": "0", "timeScale": "1440" }
+   
   ],
   "connections": [],
   "dependencies": {}
