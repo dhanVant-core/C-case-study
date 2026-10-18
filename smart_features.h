@@ -1,6 +1,7 @@
 #ifndef SMART_FEATURES_H
 #define SMART_FEATURES_H
 
-// Smart Features Scaffold
+// RMS and Apparent Power declarations
+float calculateRMS(float* samples, int n);
 
 #endif
