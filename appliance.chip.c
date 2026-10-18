@@ -1,4 +1,2 @@
-/* appliance.chip.c - 50 Hz fundamental generator */
-#include "wokwi-api.h"
-#include <math.h>
-#define MAINS_HZ 50.0f
+/* appliance.chip.c - harmonics & power factor */
+typedef struct { float I, pf, h3, h5, noise; } load_t;
