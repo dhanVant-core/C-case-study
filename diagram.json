@@ -25,7 +25,34 @@
       "top": 330,
       "left": -36,
       "attrs": { "kind": "2", "fault": "0", "timeScale": "1440" }
-   
+    },
+    {
+      "type": "chip-appliance",
+      "id": "tv",
+      "top": 390,
+      "left": 26,
+      "attrs": { "kind": "3", "fault": "0", "timeScale": "1440" }
+    },
+    {
+      "type": "chip-appliance",
+      "id": "fan",
+      "top": 330,
+      "left": 88,
+      "attrs": { "kind": "4", "fault": "0", "timeScale": "1440" }
+    },
+    {
+      "type": "chip-appliance",
+      "id": "ac",
+      "top": 390,
+      "left": 150,
+      "attrs": { "kind": "5", "fault": "0", "timeScale": "1440" }
+    },
+    {
+      "type": "chip-appliance",
+      "id": "washer",
+      "top": 330,
+      "left": 212,
+  
   ],
   "connections": [],
   "dependencies": {}
