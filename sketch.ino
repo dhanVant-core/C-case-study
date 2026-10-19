@@ -1,6 +1,5 @@
-// Real Power calculation
-float calculateRealPower(float* v, float* i, int n) {
-  float sum = 0;
-  for(int k=0; k<n; k++) sum += v[k] * i[k];
-  return sum / n;
+// Power Factor calculation
+float calculatePF(float p, float v_rms, float i_rms) {
+  float s = v_rms * i_rms;
+  return (s > 0) ? (p / s) : 1.0f;
 }
