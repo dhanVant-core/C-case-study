@@ -52,7 +52,40 @@
       "id": "washer",
       "top": 330,
       "left": 212,
-  
+      "attrs": { "kind": "6", "fault": "0", "timeScale": "1440" }
+    },
+    {
+      "type": "chip-appliance",
+      "id": "vacuum",
+      "top": 390,
+      "left": 274,
+      "attrs": { "kind": "7", "fault": "0", "timeScale": "1440" }
+    },
+    {
+      "type": "chip-appliance",
+      "id": "dryer",
+      "top": 330,
+      "left": 336,
+      "attrs": { "kind": "8", "fault": "0", "timeScale": "1440" }
+    },
+    {
+      "type": "chip-appliance",
+      "id": "zmpt",
+      "top": 390,
+      "left": 398,
+      "attrs": { "kind": "9", "fault": "0", "timeScale": "1440" }
+    },
+    {
+      "type": "chip-appliance",
+      "id": "chip1",
+      "top": -87.950393839457,
+      "left": -52.08127315110955,
+      "attrs": {}
+    }
+  ],
+  "connections": [
+    [ "lcd1:SDA", "mega:20", "green", [] ],
+    [ 
   ],
   "connections": [],
   "dependencies": {}
