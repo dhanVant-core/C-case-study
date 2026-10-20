@@ -1,7 +1,8 @@
 #ifndef SMART_FEATURES_H
 #define SMART_FEATURES_H
 
-// Energy accumulator
-void accumulateEnergy(float watts, float dt_seconds);
+float smLimitW = 2500.0f;
+float smBudgetKWh = 30.0f;
+float smTariffRs = 8.0f;
 
 #endif
