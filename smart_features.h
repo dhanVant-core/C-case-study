@@ -1,6 +1,2 @@
-#ifndef SMART_FEATURES_H
-#define SMART_FEATURES_H
-
-float smWholeHomePower();
-
-#endif
+// Peak load check
+bool checkPeakLoad(float totalPower, float ceiling);
