@@ -1,3 +1,2 @@
-// Operating hours and cycle start tracking
-uint32_t on_seconds[NUM_APPL];
-uint16_t cycle_starts[NUM_APPL];
+// Baseline learning structure
+typedef struct { float energy; float on_h; uint16_t starts; } Baseline;
