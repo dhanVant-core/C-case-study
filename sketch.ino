@@ -1,2 +1,3 @@
-// Baseline learning structure
-typedef struct { float energy; float on_h; uint16_t starts; } Baseline;
+// LCD driver config
+#include <LiquidCrystal_I2C.h>
+LiquidCrystal_I2C lcd(0x27, 20, 4);
