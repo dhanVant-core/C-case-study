@@ -1,4 +1,2 @@
-// Drift detection calculation
-float computeDriftPct(float current, float baseline) {
-  return ((current - baseline) / baseline) * 100.0f;
-}
+// LCD Page 0 display
+void displayLcdPage0(float totalKw, bool alert);
