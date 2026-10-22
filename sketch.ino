@@ -1,3 +1,4 @@
-// LCD driver config
-#include <LiquidCrystal_I2C.h>
-LiquidCrystal_I2C lcd(0x27, 20, 4);
+// Drift detection calculation
+float computeDriftPct(float current, float baseline) {
+  return ((current - baseline) / baseline) * 100.0f;
+}
