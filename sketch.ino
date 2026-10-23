@@ -1,2 +1,2 @@
-// LCD Page 0 display
-void displayLcdPage0(float totalKw, bool alert);
+// Anomaly categorization: NORMAL, HIGH USAGE, ATTENTION
+enum AnomalyStatus { STATUS_NORMAL, STATUS_HIGH, STATUS_ATTENTION };
