@@ -1,2 +1,2 @@
-// Anomaly categorization: NORMAL, HIGH USAGE, ATTENTION
-enum AnomalyStatus { STATUS_NORMAL, STATUS_HIGH, STATUS_ATTENTION };
+// LCD Page 1 display
+void displayLcdPage1(void);
