@@ -1,2 +1,2 @@
-// LCD Page 1 display
-void displayLcdPage1(void);
+#define TIME_SCALE 1440UL
+#define REPORT_HOURS 48UL
