@@ -131,4 +131,78 @@ static void plan_day(chip_t *c, int d) {
   switch (c->kind) {
     case AC:  c->nwin = 3; c->win_on[0] = 0;  c->win_off[0] = 6 + j; c->win_on[1] = 14 + j;
               c->win_off[1] = 17;    c->win_on[2] = 22.5f + j; c->win_off[2] = 24; break;
-    case FAN: c->nwin = 3; c->win_on[0] = 0; 
+    case FAN: c->nwin = 3; c->win_on[0] = 0;  c->win_off[0] = 6.5f + j; c->win_on[1] = 13 + j;
+              c->win_off[1] = 16.5f; c->win_on[2] = 21.5f + j; c->win_off[2] = 24; break;
+    case TV:  c->nwin = 2; c->win_on[0] = 7;  c->win_off[0] = 8 + j; c->win_on[1] = 19 + j;
+              c->win_off[1] = 23 + j; break;
+    case MICROWAVE: {
+      const float at[3] = { 7.4f, 13.0f, 20.2f };
+      float m = (c->fault == 1) ? 1.6f : 1.0f;   /* weak magnetron: food reheated for longer */
+      c->nev = 3;
+      for (int i = 0; i < 3; i++) {
+        c->ev_start[i] = base + (at[i] + (frand(c) - 0.5f) * 0.2f) * 3600.0;
+        c->ev_end[i] = c->ev_start[i] + (150.0f + frand(c) * 40.0f) * m;
+      }
+    } break;
+    case VACUUM: {
+      float m = (c->fault == 1) ? 1.4f : 1.0f;   /* clogged: cleaning takes longer */
+      c->nev = 1; c->ev_start[0] = base + (10.5f + (frand(c) - 0.5f) * 0.3f) * 3600.0;
+      c->ev_end[0] = c->ev_start[0] + (1000.0f + frand(c) * 120.0f) * m;
+    } break;
+    case WASHER:     c->prog_start = base + (9.0f  + frand(c) * 0.5f)  * 3600.0; break;
+    case DISHWASHER: c->prog_start = base + (21.5f + frand(c) * 0.25f) * 3600.0; break;
+    case DRYER:      c->prog_start = base + (12.5f + frand(c) * 0.3f)  * 3600.0; break;
+    default: break;
+  }
+}
+
+/* ---------- behaviour models: each returns the present load ---------- */
+static load_t model_fridge(chip_t *c, double home, float dt) {
+  float h = (float)(fmod(home, DAY_S) / 3600.0);
+  float rc = 0.35f / 60, rw = 0.15f / 60 * (ambient(home) - 4) / 26;
+  if (c->fault == 1) rc *= 0.55f;               /* refrigerant leak: weaker cooling */
+  if (c->fault == 2) rw *= 1.5f;                /* worn gasket: warm air leaks in   */
+  bool meal = (h > 7 && h < 9) || (h > 12.5f && h < 14) || (h > 19 && h < 21.5f);
+  if (meal && frand(c) < dt / 1200.0f) c->temp += 0.6f;   /* door opened */
+  if (c->trip > 0) { c->trip -= dt; c->on = false; }
+  if (!c->on && c->temp > 5.5f && c->trip <= 0) {
+    if (c->fault == 3 && frand(c) < 0.2f) {     /* weak start capacitor: failed start */
+      c->trip = 90; start_inrush(c, 9.5f); c->temp += rw * dt;
+      return L(5.2f, 0.45f, 0.05f, 0, 0.05f);
+    }
+    c->on = true; c->since = 0; start_inrush(c, c->fault == 3 ? 9.5f : 5.5f);
+  }
+  if (c->on && c->temp < 2.5f) c->on = false;
+  c->temp += (c->on ? rw - rc : rw) * dt;
+  return c->on ? L(c->fault == 1 ? 0.8f : 0.9f, 0.75f, 0.08f, 0.03f, 0.02f) : L(0.012f, 0.9f, 0, 0, 0);
+}
+
+static load_t model_ac(chip_t *c, double home, float dt) {
+  float h = (float)(fmod(home, DAY_S) / 3600.0), amb = ambient(home) + 2;
+  float rc = 0.2f / 60, k = 0.012f / 60, I = 6.2f, band = 0.5f, min_off = 180;
+  if (c->fault == 1) { rc *= 0.7f; I *= 1.15f; }       /* clogged filter / dirty coil */
+  if (c->fault == 2) { rc *= 0.45f; I *= 0.8f; }       /* low refrigerant             */
+  if (c->fault == 3) { band = 0.08f; min_off = 0; }    /* faulty thermostat           */
+  bool powered = in_windows(c, h);
+  if (!powered) c->on = false;
+  else {
+    if (!c->on && c->temp > 24 + band && c->off_time >= min_off) { c->on = true; start_inrush(c, 18); }
+    if (c->on && c->temp < 24 - band) { c->on = false; c->off_time = 0; }
+  }
+  c->temp += (k * (amb - c->temp) - (c->on ? rc : 0)) * dt;
+  c->off_time += dt;
+  if (c->on) return L(I, 0.92f, 0.05f, 0.02f, 0.015f);
+  return powered ? L(0.35f, 0.85f, 0.05f, 0, 0) : L(0.01f, 0.5f, 0, 0, 0);
+}
+
+static load_t model_fan(chip_t *c, double home) {
+  if (!in_windows(c, (float)(fmod(home, DAY_S) / 3600.0))) return L(0, 1, 0, 0, 0);
+  if (c->fault == 1) return L(0.36f, 0.82f, 0.06f, 0, 0.1f);    /* worn bearings        */
+  if (c->fault == 2) return L(0.33f, 0.66f, 0.12f, 0, 0.02f);   /* weak run capacitor   */
+  return L(0.28f, 0.92f, 0.04f, 0, 0.01f);
+}
+
+static load_t model_tv(chip_t *c, double home) {
+  if (in_windows(c, (float)(fmod(home, DAY_S) / 3600.0)))
+    return c->fault == 2 ? L(0.4f, 0.97f, 0.65f, 0.35f, 0.22f) : L(0.48f, 0.97f, 0.65f, 0.35f, 0.06f);
+  return c->fault == 1 ? L(0.075f, 0.6f, 0.8f, 0.3f, 0.05f) : L(0.
