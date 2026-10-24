@@ -1,2 +1,2 @@
-#define TIME_SCALE 1440UL
-#define REPORT_HOURS 48UL
+// LCD Page 2 display
+void displayLcdPage2(float kwh, float costRs, float budget);
