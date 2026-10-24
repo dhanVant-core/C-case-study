@@ -1,2 +1,2 @@
-// Budget forecast
-float forecastPeriodKWh(float currentWh, float elapsedSec, float totalSec);
+// Cost estimation in Rupees
+float computeCostRs(float kwh, float tariffRs);
