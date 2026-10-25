@@ -205,4 +205,89 @@ static load_t model_fan(chip_t *c, double home) {
 static load_t model_tv(chip_t *c, double home) {
   if (in_windows(c, (float)(fmod(home, DAY_S) / 3600.0)))
     return c->fault == 2 ? L(0.4f, 0.97f, 0.65f, 0.35f, 0.22f) : L(0.48f, 0.97f, 0.65f, 0.35f, 0.06f);
-  return c->fault == 1 ? L(0.075f, 0.6f, 0.8f, 0.3f, 0.05f) : L(0.
+  return c->fault == 1 ? L(0.075f, 0.6f, 0.8f, 0.3f, 0.05f) : L(0.004f, 0.6f, 0.8f, 0, 0);
+}
+
+static load_t model_microwave(chip_t *c, double home, float dt) {
+  bool on = in_events(c, home);
+  if (on && !c->on) start_inrush(c, 11);
+  c->on = on;
+  if (!on) return L(0.013f, 0.5f, 0, 0, 0);
+  if (c->fault == 1) return L(3.8f, 0.95f, 0.18f, 0.05f, 0.08f);          /* ageing magnetron */
+  if (c->fault == 2) {                                                   /* arcing HV diode  */
+    if (frand(c) < 0.03f) start_inrush(c, 16);
+    return L(5.0f, 0.9f, 0.25f, 0.08f, 0.3f);
+  }
+  return L(5.3f, 0.96f, 0.18f, 0.05f, 0.02f);
+}
+
+static load_t model_vacuum(chip_t *c, double home, float dt) {
+  bool on = in_events(c, home);
+  if (on && !c->on) start_inrush(c, 12);
+  c->on = on;
+  if (!on) return L(0, 1, 0, 0, 0);
+  if (c->fault == 1) return L(4.9f, 0.96f, 0.12f, 0.04f, 0.06f);          /* clogged filter  */
+  if (c->fault == 2) {                                                   /* worn brushes    */
+    if (frand(c) < 0.015f) start_inrush(c, 14);
+    return L(6.1f, 0.88f, 0.14f, 0.2f, 0.15f);
+  }
+  return L(6.0f, 0.96f, 0.12f, 0.04f, 0.03f);
+}
+
+static load_t program_load(chip_t *c, const phase_t *ph, float dt) {
+  if (c->kind == WASHER) {
+    bool brg = c->fault == 2;
+    switch (ph->type) {
+      case PH_HEAT:  c->water += (c->fault == 1 ? 0.55f : 1.0f) / 60 * dt;       /* scaled element */
+                     return c->fault == 1 ? L(8.1f, 1, 0.01f, 0, 0) : L(8.4f, 1, 0.01f, 0, 0);
+      case PH_MOTOR: return brg ? L(1.65f, 0.5f, 0.2f, 0.05f, 0.45f) : L(0.95f, 0.62f, 0.2f, 0.05f, 0.18f);
+      case PH_SPIN:  return brg ? L(3.6f, 0.65f, 0.25f, 0.06f, 0.2f) : L(2.3f, 0.78f, 0.25f, 0.05f, 0.08f);
+      case PH_DRAIN: return c->fault == 3 ? L(0.6f, 0.45f, 0.05f, 0, 0.15f) : L(0.28f, 0.5f, 0.05f, 0, 0);
+      default:       return L(0.08f, 0.6f, 0, 0, 0);
+    }
+  } else { /* DISHWASHER */
+    load_t pump = c->fault == 2 ? L(1.0f, 0.5f, 0.1f, 0, 0.12f) : L(0.55f, 0.6f, 0.08f, 0, 0.02f);
+    switch (ph->type) {
+      case PH_HEAT:
+        if (ph->target > 60 && c->water < 40) c->water = 40;
+        if (c->fault == 1) { c->water += 0.02f / 60 * dt; return pump; }           /* open element */
+        c->water += (c->fault == 2 ? 0.8f : 1.2f) / 60 * dt;
+        return L(8.7f + pump.I, 0.99f, 0.02f, 0, 0.01f);
+      case PH_PUMP:  return pump;
+      case PH_DRAIN: return L(0.3f, 0.5f, 0.05f, 0, 0);
+      case PH_DRY:   return L(0.04f, 0.6f, 0, 0, 0);
+      default:       return L(0.08f, 0.6f, 0, 0, 0);
+    }
+  }
+}
+
+static load_t model_program(chip_t *c, double home, float dt) {
+  const phase_t *prog = c->kind == WASHER ? WASH_PROG : DISH_PROG;
+  int n = c->kind == WASHER ? (int)WASH_N : (int)DISH_N;
+  if (!c->running && c->prog_start > 0 && home >= c->prog_start) {
+    c->running = true; c->pi = 0; c->pt = 0; c->water = 26 + frand(c) * 3; c->prog_start = -1;
+  }
+  if (!c->running) return L(0.004f, 0.5f, 0, 0, 0);
+  const phase_t *ph = &prog[c->pi];
+  c->pt += dt;
+  load_t l = program_load(c, ph, dt);
+  float dur = ph->dur;
+  if (c->kind == WASHER && ph->type == PH_DRAIN && c->fault == 3) dur = 900;  /* clogged drain */
+  bool done = ph->type == PH_HEAT ? (c->water >= ph->target || c->pt >= ph->max) : c->pt >= dur;
+  if (done) { c->pi++; c->pt = 0; if (c->pi >= n) c->running = false; }
+  return l;
+}
+
+static load_t model_dryer(chip_t *c, double home, float dt) {
+  if (!c->running && c->prog_start > 0 && home >= c->prog_start) {
+    c->running = true; c->pi = 0; c->pt = 0; c->drum = 25; c->damp = 0.9f + frand(c) * 0.2f;
+    c->heater = true; c->prog_start = -1;
+  }
+  if (!c->running) return L(0.004f, 0.5f, 0, 0, 0);
+  bool half = c->fault == 2, vent = c->fault == 1, belt = c->fault == 3;
+  float Ih = half ? 4.8f : 9.6f, Im = belt ? 2.9f : 0.9f;
+  load_t motor = L(Im, belt ? 0.42f : 0.65f, 0.12f, 0, belt ? 0.3f : 0.04f);
+  c->pt += dt;
+  if (c->pi == 0) {                                   /* drying */
+    float up = (half ? 1.2f : vent ? 3.5f : 2.0f) / 60, down = (vent ? 1.8f : 3.0f) / 60;
+    if (c->heater && 
