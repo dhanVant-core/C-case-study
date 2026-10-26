@@ -290,4 +290,84 @@ static load_t model_dryer(chip_t *c, double home, float dt) {
   c->pt += dt;
   if (c->pi == 0) {                                   /* drying */
     float up = (half ? 1.2f : vent ? 3.5f : 2.0f) / 60, down = (vent ? 1.8f : 3.0f) / 60;
-    if (c->heater && 
+    if (c->heater && c->drum >= 70) c->heater = false;
+    if (!c->heater && c->drum <= 60) c->heater = true;
+    c->drum += (c->heater ? up : -down) * dt;
+    if (c->heater) c->damp -= dt / 2700.0f * (Ih / 9.6f) * (vent ? 0.7f : 1.0f);
+    if (c->damp <= 0.03f || c->pt >= 10800) { c->pi = 1; c->pt = 0; }
+    return c->heater ? L(Ih + Im, belt ? 0.86f : 0.97f, 0.03f, 0, belt ? 0.1f : 0.02f) : motor;
+  }
+  if (c->pt >= 600) c->running = false;               /* cooling down */
+  return motor;
+}
+
+/* ---------- timers ---------- */
+static void on_model_step(void *user_data) {
+  chip_t *c = (chip_t *)user_data;
+  if (c->kind == VOLTAGE) return;
+  float f = attr_read_float(c->attr_fault);
+  c->fault = (int)(f + 0.5f);
+  double home = (double)get_sim_nanos() * 1e-9 * c->scale;
+  float dt = (float)(home - c->last_home);
+  c->last_home = home;
+  int d = (int)(home / DAY_S);
+  if (d != c->day) { c->day = d; plan_day(c, d); }
+  load_t l;
+  switch (c->kind) {
+    case FRIDGE:     l = model_fridge(c, home, dt); break;
+    case AC:         l = model_ac(c, home, dt); break;
+    case FAN:        l = model_fan(c, home); break;
+    case TV:         l = model_tv(c, home); break;
+    case MICROWAVE:  l = model_microwave(c, home, dt); break;
+    case VACUUM:     l = model_vacuum(c, home, dt); break;
+    case WASHER:
+    case DISHWASHER: l = model_program(c, home, dt); break;
+    case DRYER:      l = model_dryer(c, home, dt); break;
+    default:         l = L(0, 1, 0, 0, 0);
+  }
+  set_load(c, l);
+}
+
+static void on_wave_step(void *user_data) {
+  chip_t *c = (chip_t *)user_data;
+  uint64_t ns = get_sim_nanos();
+  float cyc = (float)((ns % 20000000ull) * 1e-9) * MAINS_HZ;   /* position within one 20 ms cycle */
+  float th = TWO_PI_F * cyc;
+  float v;
+  if (c->kind == VOLTAGE) {
+    /* ZMPT101B module: 2.5 V offset, 1.0 V peak = 325 V peak (230 V RMS) */
+    v = 2.5f + 1.0f * sinf(th) + fnoise(c) * 0.002f;
+  } else {
+    float i;
+    if (ns < c->inrush_until_ns) i = c->inrush_amp * (0.45f * sinf(th) - 0.893f * cosf(th));
+    else i = c->a1s * sinf(th) + c->a1c * cosf(th) + c->a3s * sinf(3 * th) + c->a3c * cosf(3 * th) + c->a5 * sinf(5 * th);
+    v = 2.5f + i * c->sens + fnoise(c) * 0.004f;      /* ACS712 output with ~4 mV noise */
+  }
+  if (v < 0) v = 0;
+  if (v > 5) v = 5;
+  pin_dac_write(c->out, v);
+}
+
+void chip_init(void) {
+  chip_t *c = (chip_t *)calloc(1, sizeof(chip_t));
+  c->attr_kind  = attr_init("kind", 0);
+  c->attr_fault = attr_init_float("fault", 0);
+  c->attr_scale = attr_init_float("timeScale", 1440);
+  c->kind  = (int)attr_read(c->attr_kind);
+  c->scale = attr_read_float(c->attr_scale);
+  c->out = pin_init("OUT", ANALOG);
+  c->sens = (c->kind == TV || c->kind == FAN) ? 0.185f : (c->kind == AC ? 0.066f : 0.100f);
+  c->rng = 12345u + 7919u * (uint32_t)c->kind;
+  c->day = -1; c->temp = (c->kind == AC) ? 30.0f : 2.5f + 3.0f * (float)c->kind / 9.0f;
+  c->off_time = 1e9f;
+  set_load(c, L(0, 1, 0, 0, 0));
+  pin_dac_write(c->out, 2.5f);
+
+  const timer_config_t wave = { .callback = on_wave_step, .user_data = c };
+  timer_start(timer_init(&wave), WAVE_STEP_US, true);
+  if (c->kind != VOLTAGE) {
+    const timer_config_t model = { .callback = on_model_step, .user_data = c };
+    timer_start(timer_init(&model), MODEL_STEP_US, true);
+  }
+  printf("Appliance chip kind %d ready (time scale %.0f)\n", c->kind, c->scale);
+}
