@@ -216,3 +216,158 @@ void smartReport() {
 
   Serial.println(F("######## INTELLIGENT ENERGY MANAGEMENT ########"));
 
+  Serial.print(F("48-hour energy (computed from live whole-home power): "));
+
+  Serial.print(kWh, 2);
+
+  Serial.println(F(" kWh"));
+
+  Serial.print(F("Estimated period electricity cost: Rs "));
+
+  Serial.println(kWh * smTariffRs, 2);
+
+  Serial.print(F("Configured energy budget: "));
+
+  Serial.print(smBudgetKWh, 2);
+
+  Serial.println(F(" kWh"));
+
+  Serial.print(F("Budget result: "));
+
+  Serial.println(kWh > smBudgetKWh ? F("EXCEEDED") : F("WITHIN LIMIT"));
+
+  Serial.print(F("Peak sampled household real power: "));
+
+  Serial.print(smPeakW, 0);
+
+  Serial.println(F(" W"));
+
+  Serial.print(F("Simulated time above load ceiling: "));
+
+  Serial.print(smAboveLimitSeconds / 60.0f, 1);
+
+  Serial.println(F(" minutes"));
+
+  Serial.print(F("Separate threshold-crossing episodes: "));
+
+  Serial.println(smAlertEvents);
+
+  Serial.println(F("Recommendation: stagger discretionary high-power loads to reduce concurrent demand."));
+
+  Serial.println(F("No automatic switching or appliance-level fault diagnosis is performed."));
+
+  Serial.println(F("################################################"));
+
+  Serial.println();
+
+  smPeriodWh = 0.0f;
+
+  smPeakW = 0.0f;
+
+  smAboveLimitSeconds = 0.0f;
+
+  smAlertEvents = 0;
+
+  smWasAboveLimit = false;
+
+}
+
+
+
+void smExecuteCommand(const char *cmd) {
+
+  char key = toupper((unsigned char)cmd[0]);
+
+  if (key == 'H' || key == '?') {
+
+    Serial.println(F("Commands: L 2500 (max W), B 30 (48h kWh budget), T 8 (Rs/kWh), S (status), H (help)"));
+
+    return;
+
+  }
+
+  if (key == 'S') {
+
+    Serial.print(F("SMART STATUS | now "));
+
+    Serial.print(smWholeHomePower(), 0);
+
+    Serial.print(F(" W | limit "));
+
+    Serial.print(smLimitW, 0);
+
+    Serial.print(F(" W | budget "));
+
+    Serial.print(smBudgetKWh, 1);
+
+    Serial.print(F(" kWh | tariff Rs "));
+
+    Serial.println(smTariffRs, 2);
+
+    return;
+
+  }
+
+  float value = atof(cmd + 1);
+
+  if (value <= 0) {
+
+    Serial.println(F("Invalid value. Type H for command help."));
+
+    return;
+
+  }
+
+  if (key == 'L') smLimitW = value;
+
+  else if (key == 'B') smBudgetKWh = value;
+
+  else if (key == 'T') smTariffRs = value;
+
+  else {
+
+    Serial.println(F("Unknown command. Type H for help."));
+
+    return;
+
+  }
+
+  Serial.println(F("Smart setting updated."));
+
+  smExecuteCommand("S");
+
+}
+
+
+
+void smartCommand() {
+
+  while (Serial.available()) {
+
+    char c = (char)Serial.read();
+
+    if (c == '\r' || c == '\n') {
+
+      if (smCommandLength) {
+
+        smCommand[smCommandLength] = '\0';
+
+        smExecuteCommand(smCommand);
+
+        smCommandLength = 0;
+
+      }
+
+    } else if (smCommandLength < sizeof(smCommand) - 1) {
+
+      smCommand[smCommandLength++] = c;
+
+    }
+
+  }
+
+}
+
+
+
+#endif

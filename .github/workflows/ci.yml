@@ -1,0 +1,33 @@
+name: System Verification CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Run Discrete Power Math Unit Tests
+      run: |
+        python tools/test_power_sampling.py
+
+    - name: Execute AI Reporting Generation
+      run: |
+        python tools/ai_reporter.py
+
+    - name: Validate Wokwi Netlist JSON Syntax
+      run: |
+        python -c "import json; json.load(open('diagram.json'))"
+        python -c "import json; json.load(open('appliance.chip.json'))"
